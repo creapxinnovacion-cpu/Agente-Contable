@@ -1,0 +1,15 @@
+{
+  "ventasConsumidorFinal": [
+    { "numeroDocumento": "FAC-1001", "fecha": "01/03/2026", "cliente": "Juan Pérez", "exento": 0, "gravado": 45.20 },
+    { "numeroDocumento": "FAC-1002", "fecha": "03/03/2026", "cliente": "María Gómez", "exento": 12.00, "gravado": 89.50 },
+    { "numeroDocumento": "FAC-1003", "fecha": "05/03/2026", "cliente": "Carlos López", "exento": 0, "gravado": 120.00 }
+  ],
+  "ventasContribuyentes": [
+    { "numeroComprobante": "CCF-0015", "fecha": "10/03/2026", "cliente": "Librería Estudiantil S.A. de C.V.", "nrc": "123456-7", "exento": 0, "netoGravado": 1500.00 },
+    { "numeroComprobante": "CCF-0016", "fecha": "15/03/2026", "cliente": "Distribuidora Central El Salvador", "nrc": "987654-3", "exento": 50.00, "netoGravado": 4200.00 }
+  ],
+  "compras": [
+    { "numeroDocumento": "CCF-8921", "fecha": "02/03/2026", "proveedor": "Oficina Plus S.A.", "nrc": "456789-0", "exento": 0, "netoGravado": 800.00 },
+    { "numeroDocumento": "CCF-4432", "fecha": "12/03/2026", "proveedor": "Tech Supplies El Salvador", "nrc": "112233-4", "exento": 0, "netoGravado": 2100.00 }
+  ]
+}
