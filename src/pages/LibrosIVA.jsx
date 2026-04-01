@@ -1,11 +1,248 @@
 import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { validateBatch } from '../utils/validations';
 
+// ─── Íconos inline para no tener que añadir dependencias ────────────────────
+const IconAlert = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const IconInfo = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+    <line x1="12" y1="8" x2="12.01" y2="8"/>
+  </svg>
+);
+const IconChevron = ({ open }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+
+// ─── Componente: Panel de Validaciones ──────────────────────────────────────
+function ValidationPanel({ validation }) {
+  const [open, setOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('criticos');
+
+  if (!validation) return null;
+
+  const { summary, global } = validation;
+  const hasErrors = summary.totalCritical > 0;
+  const hasWarnings = summary.totalWarnings > 0;
+
+  // Recopilar DTEs con error por libro
+  const dtesConError = {
+    contribuyentes: validation.contribuyentes.results.filter(r => r.errors.length > 0 || r.warnings.length > 0),
+    consumidor:     validation.consumidor.results.filter(r => r.errors.length > 0 || r.warnings.length > 0),
+    compras:        validation.compras.results.filter(r => r.errors.length > 0 || r.warnings.length > 0),
+  };
+
+  const bannerColor = hasErrors
+    ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'
+    : hasWarnings
+    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
+    : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800';
+
+  const bannerTextColor = hasErrors
+    ? 'text-red-700 dark:text-red-300'
+    : hasWarnings
+    ? 'text-amber-700 dark:text-amber-300'
+    : 'text-emerald-700 dark:text-emerald-300';
+
+  return (
+    <div className={`rounded-xl border ${bannerColor} overflow-hidden`}>
+      {/* Header siempre visible */}
+      <button
+        className={`w-full flex items-center justify-between px-5 py-4 ${bannerTextColor} hover:opacity-80 transition-opacity`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="flex items-center gap-3 font-semibold text-sm">
+          {hasErrors ? <IconAlert /> : <IconCheck />}
+          {hasErrors
+            ? `🚨 ${summary.totalCritical} error${summary.totalCritical !== 1 ? 'es' : ''} crítico${summary.totalCritical !== 1 ? 's' : ''} detectado${summary.totalCritical !== 1 ? 's' : ''} — Exportación bloqueada`
+            : hasWarnings
+            ? `⚠️ Datos válidos con ${summary.totalWarnings} advertencia${summary.totalWarnings !== 1 ? 's' : ''}`
+            : '✅ Todos los datos son válidos — Exportación habilitada'}
+        </span>
+        <span className="flex items-center gap-2 text-xs opacity-70">
+          Ver detalles <IconChevron open={open} />
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-current/10 px-5 pb-5 pt-3 space-y-4">
+          {/* Tabs internas */}
+          <div className="flex gap-2 text-xs font-medium flex-wrap">
+            {['criticos', 'advertencias', 'cuadre'].map(sec => (
+              <button
+                key={sec}
+                onClick={() => setActiveSection(sec)}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  activeSection === sec
+                    ? 'bg-white dark:bg-neutral-800 shadow text-neutral-900 dark:text-white'
+                    : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+                }`}
+              >
+                {sec === 'criticos'     && `🔴 Críticos (${summary.totalCritical})`}
+                {sec === 'advertencias' && `🟡 Advertencias (${summary.totalWarnings})`}
+                {sec === 'cuadre'       && '📊 Cuadre Fiscal'}
+              </button>
+            ))}
+          </div>
+
+          {/* Errores críticos */}
+          {activeSection === 'criticos' && (
+            <div className="space-y-3">
+              {/* Errores globales (duplicados, cruces) */}
+              {global.errors.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-red-600 dark:text-red-400 mb-1.5 flex items-center gap-1">
+                    <IconInfo /> Errores Globales / Cruzados
+                  </p>
+                  <ul className="space-y-1">
+                    {global.errors.map((e, i) => (
+                      <li key={i} className="text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/50 px-3 py-2 rounded-lg flex gap-2">
+                        <span className="font-mono text-red-400 shrink-0">[{e.code}]</span> {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* DTEs con errores por libro */}
+              {[
+                { key: 'contribuyentes', label: 'Contribuyentes (CCF)' },
+                { key: 'consumidor',     label: 'Consumidor Final' },
+                { key: 'compras',        label: 'Compras' },
+              ].map(({ key, label }) => {
+                const conError = dtesConError[key].filter(r => r.errors.length > 0);
+                if (conError.length === 0) return null;
+                return (
+                  <div key={key}>
+                    <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-1.5">{label}</p>
+                    <div className="space-y-2">
+                      {conError.map((r) => (
+                        <div key={r.idx} className="bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                            DTE #{r.idx + 1} — {r.dte.codigoGeneracion ?? r.dte.numeroDocumento ?? '(sin ID)'}
+                          </p>
+                          <ul className="space-y-1">
+                            {r.errors.map((e, ei) => (
+                              <li key={ei} className="text-xs text-red-700 dark:text-red-300 flex gap-2">
+                                <span className="font-mono text-red-400 shrink-0">[{e.code}]</span> {e.message}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {summary.totalCritical === 0 && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">✅ Sin errores críticos.</p>
+              )}
+            </div>
+          )}
+
+          {/* Advertencias */}
+          {activeSection === 'advertencias' && (
+            <div className="space-y-3">
+              {global.warnings.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1.5">Advertencias Globales</p>
+                  <ul className="space-y-1">
+                    {global.warnings.map((w, i) => (
+                      <li key={i} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-3 py-2 rounded-lg flex gap-2">
+                        <span className="font-mono text-amber-400 shrink-0">[{w.code}]</span> {w.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {[
+                { key: 'contribuyentes', label: 'Contribuyentes (CCF)' },
+                { key: 'consumidor',     label: 'Consumidor Final' },
+                { key: 'compras',        label: 'Compras' },
+              ].map(({ key, label }) => {
+                const conWarn = dtesConError[key].filter(r => r.warnings.length > 0);
+                if (conWarn.length === 0) return null;
+                return (
+                  <div key={key}>
+                    <p className="text-xs font-bold text-neutral-500 dark:text-neutral-400 mb-1.5">{label}</p>
+                    <div className="space-y-2">
+                      {conWarn.map((r) => (
+                        <div key={r.idx} className="bg-white dark:bg-neutral-900 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">
+                            DTE #{r.idx + 1} — {r.dte.codigoGeneracion ?? r.dte.numeroDocumento ?? '(sin ID)'}
+                          </p>
+                          <ul className="space-y-1">
+                            {r.warnings.map((w, wi) => (
+                              <li key={wi} className="text-xs text-amber-700 dark:text-amber-300 flex gap-2">
+                                <span className="font-mono text-amber-400 shrink-0">[{w.code}]</span> {w.message}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {summary.totalWarnings === 0 && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">✅ Sin advertencias.</p>
+              )}
+            </div>
+          )}
+
+          {/* Cuadre fiscal global */}
+          {activeSection === 'cuadre' && (
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {[
+                { label: 'Total Ventas Contribuyentes', val: global.summary.totalVentasContrib, color: 'text-blue-600 dark:text-blue-400' },
+                { label: 'Total Ventas Consumidor Final', val: global.summary.totalVentasConsumidor, color: 'text-blue-600 dark:text-blue-400' },
+                { label: 'Total Compras', val: global.summary.totalCompras, color: 'text-neutral-700 dark:text-neutral-300' },
+                { label: 'IVA Débito (Ventas)', val: global.summary.ivaDebito, color: 'text-rose-600 dark:text-rose-400' },
+                { label: 'IVA Crédito (Compras)', val: global.summary.ivaCredito, color: 'text-emerald-600 dark:text-emerald-400' },
+                {
+                  label: 'IVA Neto (Débito − Crédito)',
+                  val: global.summary.ivaNeto,
+                  color: global.summary.ivaNeto >= 0 ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-emerald-700 dark:text-emerald-300 font-bold'
+                },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg px-3 py-2.5">
+                  <p className="text-neutral-500 mb-0.5">{label}</p>
+                  <p className={`text-sm font-semibold ${color}`}>${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Componente Principal ───────────────────────────────────────────────────
 export default function LibrosIVA() {
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState('consumidor');
-  
+  const [validation, setValidation] = useState(null);
+
   // F-07 Export State
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportConfig, setExportConfig] = useState({
@@ -24,7 +261,10 @@ export default function LibrosIVA() {
     const savedData = localStorage.getItem('contapp_data');
     if (savedData) {
       try {
-        setData(JSON.parse(savedData));
+        const parsed = JSON.parse(savedData);
+        setData(parsed);
+        // Ejecutar validaciones automáticamente al cargar
+        setValidation(validateBatch(parsed));
       } catch (e) {
         console.error("Error al parsear data", e);
       }
@@ -55,37 +295,35 @@ export default function LibrosIVA() {
   // Utility to format money
   const fmt = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
+  // ─── Helper: ¿tiene errores críticos este tab? ─────────────────────────
+  const tabHasCritical = (tabId) => {
+    if (!validation) return false;
+    if (tabId === 'contribuyentes') return validation.contribuyentes.results.some(r => r.errors.length > 0);
+    if (tabId === 'consumidor')     return validation.consumidor.results.some(r => r.errors.length > 0);
+    if (tabId === 'compras')        return validation.compras.results.some(r => r.errors.length > 0);
+    return false;
+  };
+
+  // ─── Indicador de error por fila ─────────────────────────────────────────
+  const rowHasErrors = (tabId, idx) => {
+    if (!validation) return { hasError: false, hasWarn: false };
+    const results = validation[tabId === 'contribuyentes' ? 'contribuyentes'
+                            : tabId === 'consumidor'      ? 'consumidor'
+                            : 'compras'].results;
+    const r = results[idx];
+    if (!r) return { hasError: false, hasWarn: false };
+    return { hasError: r.errors.length > 0, hasWarn: r.warnings.length > 0 };
+  };
+
+  // ─── Exportaciones (lógica intacta) ──────────────────────────────────────
+
   const exportarCSVContribuyentes = () => {
     if (!data || !data.ventasContribuyentes || data.ventasContribuyentes.length === 0) {
       alert("No hay datos de contribuyentes para exportar.");
       return;
     }
 
-    const headers = [
-      "FECHA DE EMISIÓN DEL DOCUMENTO",
-      "CLASE DE DOCUMENTO",
-      "TIPO DE DOCUMENTO",
-      "NUMERO DE RESOLUCIÓN",
-      "SERIE DEL DOCUMENTO",
-      "NÚMERO DE DOCUMENTO",
-      "NÚMERO DE CONTROL INTERNO",
-      "NIT O NRC DEL CLIENTE",
-      "NOMBRE RAZÓN SOCIAL O DENOMINACIÓN",
-      "VENTAS EXENTAS",
-      "VENTAS NO SUJETAS",
-      "Ventas Gravadas Locales",
-      "DEBITO FISCAL",
-      "VENTAS A CUENTA DE TERCEROS NO DOMICILIADOS",
-      "DEBITO FISCAL POR VENTAS A CUENTA DE TERCEROS",
-      "TOTAL DE VENTAS",
-      "NUMERO DE DUI DEL CLIENTE",
-      "TIPO DE OPERACIÓN (Renta)",
-      "TIPO DE INGRESO (Renta)",
-      "NÚMERO DEL ANEXO"
-    ];
-
     const rows = [];
-    // La plataforma del MH (F-07) no requiere ni acepta fila de encabezados, así que la omitimos.
 
     data.ventasContribuyentes.forEach((item) => {
       const exento = item.exento || 0;
@@ -147,8 +385,6 @@ export default function LibrosIVA() {
     });
 
     const csvContent = rows.join("\r\n");
-    // Removido BOM temporalmente por si genera conflictos con la codificación estricta del MH 
-    // Usamos text/csv plano
     const blob = new Blob([csvContent], { type: "text/csv" });
     const fechaDL = new Date().toISOString().split("T")[0];
     const link = document.createElement("a");
@@ -320,6 +556,9 @@ export default function LibrosIVA() {
     setShowExportModal(false);
   };
 
+  // Determinar si el tab activo tiene errores críticos (bloquear exportación)
+  const canExportCurrentTab = validation ? !tabHasCritical(activeTab) && validation.global.errors.length === 0 : true;
+
   return (
     <div className="space-y-6">
       <div>
@@ -329,21 +568,28 @@ export default function LibrosIVA() {
         </p>
       </div>
 
+      {/* ── Panel de Validaciones ── */}
+      <ValidationPanel validation={validation} />
+
       <div className="flex bg-neutral-100/50 dark:bg-neutral-800/50 p-1.5 rounded-xl gap-2 w-full overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`
-              flex-1 whitespace-nowrap px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300
-              ${activeTab === tab.id 
-                ? 'bg-white dark:bg-neutral-700 shadow-sm text-blue-600 dark:text-blue-400' 
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-neutral-800'}
-            `}
-          >
-            {tab.name}
-          </button>
-        ))}
+        {tabs.map(tab => {
+          const hasCrit = tabHasCritical(tab.id);
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex-1 whitespace-nowrap px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1.5
+                ${activeTab === tab.id 
+                  ? 'bg-white dark:bg-neutral-700 shadow-sm text-blue-600 dark:text-blue-400' 
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-neutral-800'}
+              `}
+            >
+              {hasCrit && <span className="text-red-500 text-xs">🔴</span>}
+              {tab.name}
+            </button>
+          );
+        })}
       </div>
 
       <Card className="!p-0 overflow-hidden border border-neutral-200 dark:border-neutral-800">
@@ -354,6 +600,7 @@ export default function LibrosIVA() {
               <>
                 <thead className="bg-neutral-50 dark:bg-neutral-900/50 text-neutral-800 dark:text-neutral-200 border-b border-neutral-200 dark:border-neutral-800">
                   <tr>
+                    <th className="px-4 py-4 font-semibold w-8"></th>
                     <th className="px-6 py-4 font-semibold">N° Doc</th>
                     <th className="px-6 py-4 font-semibold">Fecha</th>
                     <th className="px-6 py-4 font-semibold">Cliente</th>
@@ -363,20 +610,27 @@ export default function LibrosIVA() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/50">
-                  {data.ventasConsumidorFinal.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
-                      <td className="px-6 py-4 font-mono text-xs">{item.numeroDocumento}</td>
-                      <td className="px-6 py-4">{item.fecha}</td>
-                      <td className="px-6 py-4">{item.cliente}</td>
-                      <td className="px-6 py-4 text-right">{fmt(item.exento || 0)}</td>
-                      <td className="px-6 py-4 text-right font-medium">{fmt(item.gravado)}</td>
-                      <td className="px-6 py-4 text-right text-blue-600 dark:text-blue-400 font-bold">
-                        {fmt((item.exento || 0) + item.gravado)}
-                      </td>
-                    </tr>
-                  ))}
+                  {data.ventasConsumidorFinal.map((item, idx) => {
+                    const { hasError, hasWarn } = rowHasErrors('consumidor', idx);
+                    return (
+                      <tr key={idx} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors ${hasError ? 'bg-red-50/50 dark:bg-red-950/20' : hasWarn ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
+                        <td className="px-4 py-4 text-center">
+                          {hasError && <span title="Errores críticos">🔴</span>}
+                          {!hasError && hasWarn && <span title="Advertencias">🟡</span>}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-xs">{item.numeroDocumento}</td>
+                        <td className="px-6 py-4">{item.fecha}</td>
+                        <td className="px-6 py-4">{item.cliente}</td>
+                        <td className="px-6 py-4 text-right">{fmt(item.exento || 0)}</td>
+                        <td className="px-6 py-4 text-right font-medium">{fmt(item.gravado)}</td>
+                        <td className="px-6 py-4 text-right text-blue-600 dark:text-blue-400 font-bold">
+                          {fmt((item.exento || 0) + item.gravado)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {data.ventasConsumidorFinal.length === 0 && (
-                     <tr><td colSpan="6" className="px-6 py-8 text-center text-neutral-400">No hay registros de Consumidor Final</td></tr>
+                     <tr><td colSpan="7" className="px-6 py-8 text-center text-neutral-400">No hay registros de Consumidor Final</td></tr>
                   )}
                 </tbody>
               </>
@@ -386,6 +640,7 @@ export default function LibrosIVA() {
               <>
                 <thead className="bg-neutral-50 dark:bg-neutral-900/50 text-neutral-800 dark:text-neutral-200 border-b border-neutral-200 dark:border-neutral-800">
                   <tr>
+                    <th className="px-4 py-4 font-semibold w-8"></th>
                     <th className="px-6 py-4 font-semibold">N° CCF</th>
                     <th className="px-6 py-4 font-semibold">Fecha</th>
                     <th className="px-6 py-4 font-semibold">Cliente / Razón Social</th>
@@ -397,12 +652,15 @@ export default function LibrosIVA() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/50">
                   {data.ventasContribuyentes.map((item, idx) => {
-                    // Logic typically required by El Salvador: neto * 13% = iva
                     const iva = +(item.netoGravado * 0.13).toFixed(2);
                     const total = (item.netoGravado + iva + (item.exento || 0));
-                    
+                    const { hasError, hasWarn } = rowHasErrors('contribuyentes', idx);
                     return (
-                      <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+                      <tr key={idx} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors ${hasError ? 'bg-red-50/50 dark:bg-red-950/20' : hasWarn ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
+                        <td className="px-4 py-4 text-center">
+                          {hasError && <span title="Errores críticos">🔴</span>}
+                          {!hasError && hasWarn && <span title="Advertencias">🟡</span>}
+                        </td>
                         <td className="px-6 py-4 font-mono text-xs">{item.numeroComprobante}</td>
                         <td className="px-6 py-4">{item.fecha}</td>
                         <td className="px-6 py-4 font-medium">{item.cliente}</td>
@@ -413,10 +671,10 @@ export default function LibrosIVA() {
                           {fmt(total)}
                         </td>
                       </tr>
-                    )
+                    );
                   })}
                   {data.ventasContribuyentes.length === 0 && (
-                     <tr><td colSpan="7" className="px-6 py-8 text-center text-neutral-400">No hay registros de Contribuyentes</td></tr>
+                     <tr><td colSpan="8" className="px-6 py-8 text-center text-neutral-400">No hay registros de Contribuyentes</td></tr>
                   )}
                 </tbody>
               </>
@@ -426,6 +684,7 @@ export default function LibrosIVA() {
               <>
                 <thead className="bg-neutral-50 dark:bg-neutral-900/50 text-neutral-800 dark:text-neutral-200 border-b border-neutral-200 dark:border-neutral-800">
                   <tr>
+                    <th className="px-4 py-4 font-semibold w-8"></th>
                     <th className="px-6 py-4 font-semibold">N° Doc</th>
                     <th className="px-6 py-4 font-semibold">Fecha</th>
                     <th className="px-6 py-4 font-semibold">Proveedor</th>
@@ -440,9 +699,13 @@ export default function LibrosIVA() {
                   {data.compras.map((item, idx) => {
                     const iva = +(item.netoGravado * 0.13).toFixed(2);
                     const total = (item.netoGravado + iva + (item.exento || 0));
-                    
+                    const { hasError, hasWarn } = rowHasErrors('compras', idx);
                     return (
-                      <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+                      <tr key={idx} className={`hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors ${hasError ? 'bg-red-50/50 dark:bg-red-950/20' : hasWarn ? 'bg-amber-50/50 dark:bg-amber-950/10' : ''}`}>
+                        <td className="px-4 py-4 text-center">
+                          {hasError && <span title="Errores críticos">🔴</span>}
+                          {!hasError && hasWarn && <span title="Advertencias">🟡</span>}
+                        </td>
                         <td className="px-6 py-4 font-mono text-xs">{item.numeroDocumento}</td>
                         <td className="px-6 py-4">{item.fecha}</td>
                         <td className="px-6 py-4">{item.proveedor}</td>
@@ -454,10 +717,10 @@ export default function LibrosIVA() {
                           {fmt(total)}
                         </td>
                       </tr>
-                    )
+                    );
                   })}
                   {data.compras.length === 0 && (
-                     <tr><td colSpan="8" className="px-6 py-8 text-center text-neutral-400">No hay registros de Compras</td></tr>
+                     <tr><td colSpan="9" className="px-6 py-8 text-center text-neutral-400">No hay registros de Compras</td></tr>
                   )}
                 </tbody>
               </>
@@ -472,15 +735,24 @@ export default function LibrosIVA() {
           <Button variant="secondary" onClick={() => window.print()}>
             Exportar PDF / Imprimir
           </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => {
-              // Now enabled for all active tabs
-              setShowExportModal(true);
-            }}
-          >
-            Generar F-07 (CSV)
-          </Button>
+          <div className="relative group">
+            <Button 
+              variant="primary" 
+              onClick={() => {
+                if (!canExportCurrentTab) return;
+                setShowExportModal(true);
+              }}
+              style={!canExportCurrentTab ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            >
+              Generar F-07 (CSV)
+              {!canExportCurrentTab && ' 🔒'}
+            </Button>
+            {!canExportCurrentTab && (
+              <div className="absolute bottom-full right-0 mb-2 px-3 py-2 text-xs bg-red-700 text-white rounded-lg shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                Corrija los errores críticos para habilitar la exportación
+              </div>
+            )}
+          </div>
         </div>
       )}
 
