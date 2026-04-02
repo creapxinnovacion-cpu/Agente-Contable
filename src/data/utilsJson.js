@@ -112,6 +112,7 @@ export function mapToConsumidorFinal(json) {
     "exento": parseFloat(resumen.totalExenta) || parseFloat(resumen.totalNoSuj) || 0,
     "gravado": parseFloat(resumen.totalGravada) || parseFloat(resumen.totalPagar) || 0,
     "codigoGeneracion": identificacion.codigoGeneracion || "",
+    "numeroControl": identificacion.numeroControl || "",
     "tipoDocumento": identificacion.tipoDte || "01"
   };
 }
@@ -132,6 +133,7 @@ export function mapToCompras(json) {
     "netoGravado": parseFloat(resumen.totalGravada) || parseFloat(resumen.subTotal) || 0,
     // [Agregados MH F-07 Anexo 3]
     "codigoGeneracion": identificacion.codigoGeneracion || "",
+    "numeroControl": identificacion.numeroControl || "",
     "tipoDocumento": identificacion.tipoDte || "03" // Factura de Compra normal "03" CCF
   };
 }

@@ -30,6 +30,15 @@ El proyecto está creado utilizando React (Vite) y una arquitectura modular, per
 5. **Tablero y Gráficos (`/`)**
    Pantalla de resumen (Dashboard Home) con insights estadísticos del negocio, que en futuras versiones podrá atarse directo a la metadata en la memoria.
 
+## Nuevas Funciones y Roadmap
+
+Actualmente se están desarrollando o ya se encuentran integradas las siguientes funciones:
+
+1. **Validaciones Avanzadas de DTEs:** Motor de escaneo y validación estricto (críticos, alertas, cuadres) para prevenir bloqueos de exportación en los reportes F-07.
+2. 📊 **Dashboard contable:** Interfaz ampliada para controlar las operaciones y visualización de impuestos en tiempo real.
+3. 🤖 **Asientos automáticos:** Generación de partidas contables automatizadas a partir de cada DTE almacenado.
+4. 🔗 **Conexión directa con MH API / Agente de IA:** Integración futura para reportar directamente al Ministerio de Hacienda de manera automatizada y asistencia mediante IA.
+
 ## Instrucciones para Desarrolladores
 - **Instalación:** `npm install`
 - **Servidor Local:** `npm run dev`
