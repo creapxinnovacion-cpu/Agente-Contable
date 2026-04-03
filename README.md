@@ -44,3 +44,52 @@ Actualmente se están desarrollando o ya se encuentran integradas las siguientes
 - **Servidor Local:** `npm run dev`
 - Todas las lógicas de recálculo de IVA sobre los Netos pre-DTE se encuentran dentro de `LibrosIVA.jsx`.
 - Para refinar la detección de qué documento es una "Compra" o una "Venta CCF", ver el script de `detectarTipoDTE()` en `/src/data/utilsJson.js`.
+
+---
+
+## ✅ Integración del Backend SaaS (Completada)
+
+Para habilitar la multi-tenencia (múltiples empresas por contador) y la autenticación real, se construyó exitosamente el Backend en **FastAPI (Python)** y una base de datos en SQLAlchemy. El backend y su propio registro se administran en el repositorio adjunto `API-Agente-Contable`. La validación ahora maneja conexiones **CORS** seguras y tokens JWT reales consumidos por este Frontend.
+
+### Esquema SQL Recomendado
+```sql
+CREATE TABLE empresas (
+  id BIGSERIAL PRIMARY KEY,
+  nombre_razon_social VARCHAR(255) NOT NULL,
+  nit VARCHAR(20) UNIQUE NOT NULL,
+  correo VARCHAR(150),
+  estado VARCHAR(20) DEFAULT 'ACTIVA',
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);CREATE TABLE usuarios (
+  id BIGSERIAL PRIMARY KEY,
+  nombre VARCHAR(150) NOT NULL,
+  email VARCHAR(150) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  estado VARCHAR(20) DEFAULT 'ACTIVO',
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE usuario_empresas (
+  id BIGSERIAL PRIMARY KEY,
+  usuario_id BIGINT NOT NULL,
+  empresa_id BIGINT NOT NULL,
+
+  rol VARCHAR(20) DEFAULT 'CONTADOR',
+
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+  FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE,
+
+  UNIQUE(usuario_id, empresa_id)
+);
+```
+
+### Flujo de Autenticación JWT
+1. El Cliente envía `email` y `password` al back.
+2. El Backend cruza las credenciales, busca la tabla intermendia y devuelve un JWT.
+3. El payload del token incluirá: `sub: usuario_id`, `empresaActiva: ID`, `nitEmpresa: '...'`.
+4. El Frontend guarda este token y utiliza el `nitEmpresa` para la autodetección de Archivos JSON en la sección `/Json.jsx`.

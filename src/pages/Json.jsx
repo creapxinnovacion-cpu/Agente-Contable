@@ -5,8 +5,12 @@ import {
   mapToCompras,
   detectarTipoDTE
 } from "../data/utilsJson";
+import { useAuth } from "../context/AuthContext";
 
 export default function Json() {
+  const { user } = useAuth();
+  const miNit = user?.empresaActiva?.nit || "";
+
   const [data, setData] = useState({
     ventasConsumidorFinal: [],
     ventasContribuyentes: [],
@@ -40,7 +44,7 @@ export default function Json() {
           const json = JSON.parse(e.target.result);
           
           // Detectar automáticamente el tipo de documento para clasificarlo
-          const tipo = detectarTipoDTE(json);
+          const tipo = detectarTipoDTE(json, miNit);
           
           if (tipo === 'consumidor_final') {
             batch.ventasConsumidorFinal.push(mapToConsumidorFinal(json));

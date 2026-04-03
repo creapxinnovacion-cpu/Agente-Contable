@@ -32,30 +32,35 @@ export function formatCurrency(value) {
 /* ===============================
    Detector de Tipo DTE
 ================================ */
-export function detectarTipoDTE(json) {
+export function detectarTipoDTE(json, miNit) {
   const identificacion = json.identificacion || {};
   const tipo = identificacion.tipoDte || "";
+  const nitEmisor = String(json.emisor?.nit || "").replace(/-/g, "");
 
   // 01 = Factura (Consumidor Final)
   // 03 = Comprobante de Crédito Fiscal (Contribuyentes)
   // 11 = Factura de Exportación
   // 14 = Factura de Sujeto Excluido
   
+  // SANITIZE miNit to avoid formatting mismatch
+  const miNitLimpio = String(miNit || "").replace(/-/g, "");
+
   if (tipo === "01") {
-    return "consumidor_final";
+    // Si somos los emisores, es una Venta a Consumidor Final legítima
+    if (!miNitLimpio || nitEmisor === miNitLimpio) {
+       return "consumidor_final";
+    } else {
+       // Somos los receptores (Compra como Consumidor Final de empresa)
+       return "compra";
+    }
   } else if (tipo === "03") {
-    // Aquí idealmente debes revisar si "emisor.nit" es el NIT de la propia empresa,
-    // significa que es una Venta a Contribuyente.
-    // Si "receptor.nit" es tu NIT, entonces es una COMPRA recibida de otro proveedor.
-    // Vamos a asumir por simplificación de este esquema o puedes modificar la lógica:
-    
-    // Suponiendo que el usuario lo usa principalmente para ventas a contribuyentes:
-    // (A menos que agregues la lógica comparando con tu local NIT).
-    // Para compras, podrías tener otro botón o confiar en el nombre.
-    // Por ahora, lo dejaremos como "contribuyente" y te toca a ti perfeccionar si necesitas compras automáticas.
-    
-    // Si hay un receptor específico y no tiene tu NIT, son ventas:
-    return "contribuyente";
+    if (!miNitLimpio || nitEmisor === miNitLimpio) {
+       // Nosotros emitimos (Venta a contribuyente)
+       return "contribuyente";
+    } else {
+       // Nos emitieron a nosotros (Compra CCF)
+       return "compra";
+    }
   } 
   
   // Por defecto, lo marcamos para revisión
