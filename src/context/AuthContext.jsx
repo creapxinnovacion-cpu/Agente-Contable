@@ -34,10 +34,34 @@ export function AuthProvider({ children }) {
 
       const data = await response.json();
 
-      // 🔥 AHORA tu API devuelve JWT, no "datos"
+      // 🔥 AHORA tu API devuelve JWT, extraemos el payload para obtener el NIT y el Rol
+      const token = data.access_token;
+      let payload = {};
+      
+      try {
+        // Obtenemos la segunda parte del token (el payload)
+        const payloadBase64Url = token.split('.')[1];
+        const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/, '/');
+        // Usamos atob y charcodes para no tener problemas con tildes o caracteres especiales en UTF-8
+        const jsonPayload = decodeURIComponent(atob(payloadBase64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        payload = JSON.parse(jsonPayload);
+      } catch(e) {
+        console.error("Error al decodificar JWT Payload en el front:", e);
+      }
+
       const finalUser = {
+        id: payload.sub || payload.usuario_id || 1,
+        name: payload.nombre || username,
         username: username,
-        token: data.access_token,
+        token: token,
+        rol: payload.rol || (payload.is_admin ? 'ADMIN' : 'CONTADOR'),
+        empresaActiva: {
+          id: payload.empresa_id || payload.empresaActiva || 1,
+          nit: payload.nit || payload.nitEmpresa || "", // Elemento clave para detectar Ventas vs Compras
+          nombre: payload.nombre_razon_social || ""
+        }
       };
 
       setUser(finalUser);

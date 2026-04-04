@@ -64,7 +64,7 @@ export default function Login() {
               placeholder="usuario@empresa.com"
               autoComplete="username"
             />
-            
+
             <Input
               label="Contraseña"
               type="password"
@@ -99,10 +99,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-          
-          <div className="mt-6 text-center text-xs text-neutral-500 dark:text-neutral-500">
-            * Versión demo. Usa <b>admin</b> / <b>admin</b>
-          </div>
         </Card>
       </div>
     </div>
