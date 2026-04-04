@@ -13,6 +13,14 @@ El proyecto está creado utilizando React (Vite) y una arquitectura modular, per
 - `src/data/`: Scripts utilitarios e interfaces de datos (e.g. `utilsJson.js`).
 - `src/context/`: Contextos de la aplicación (e.g. `AuthContext` para el estado de autenticación).
 
+## Ramas del Repositorio
+
+A continuación se detalla el propósito de cada rama activa en este repositorio:
+
+- **`master`**: Rama principal estable. Contiene la versión base del proyecto operando de manera local sin backend mediante `localStorage`.
+- **`actualizacion-validaciones`**: Rama enfocada en aplicar el motor de reglas y validaciones estrictas (alertas, errores críticos, cálculos matemáticos) al procesar los DTE. Indispensable para asegurar integridad al exportar los reportes F-07.
+- **`feature/saas-frontend-prep`**: Rama activa de transición hacia el nuevo sistema SaaS multi-tenant. Aquí se acondiciona el Frontend para el consumo de la API local en Python (FastAPI), implementación de autenticación por tokens JWT y el soporte para multi-empresa.
+
 ## Flujo de Trabajo (Funciones)
 
 1. **Login Sencillo (`/login`)**

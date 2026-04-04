@@ -14,15 +14,18 @@ export function AuthProvider({ children }) {
     }
     setLoading(false);
   }, []);
-
+  //validacion de credenciales de los usuarios para el ingreso a la platarform
   const login = async (username, password) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch('https://api-agente-contable.onrender.com/auth/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email: username, password: password }),
+        body: JSON.stringify({
+          email: username,
+          password: password
+        })
       });
 
       if (!response.ok) {
@@ -30,30 +33,18 @@ export function AuthProvider({ children }) {
       }
 
       const data = await response.json();
-      
-      // Decodificar JWT levemente si es necesario, o basarnos en un return propio
-      // FastAPI está retornando solo access_token, podemos parsearlo.
-      const token = data.access_token;
-      
-      // Para simular el estado actual basándonos en payload del token sin librería jsonwebtoken:
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/, '/');
-      const payload = JSON.parse(window.atob(payloadBase64));
 
-      const finalUser = { 
-        id: payload.sub, 
-        name: payload.email, 
-        username: payload.email,
-        token: token,
-        empresaActiva: {
-          id: payload.empresaActiva,
-          nit: payload.nitEmpresa // Ya validado desde backend
-        }
+      // 🔥 AHORA tu API devuelve JWT, no "datos"
+      const finalUser = {
+        username: username,
+        token: data.access_token,
       };
-      
+
       setUser(finalUser);
       localStorage.setItem('contapp_user', JSON.stringify(finalUser));
+
       return true;
+
     } catch (error) {
       console.error("Error al comunicarse con la API de Login:", error);
       return false;
@@ -67,7 +58,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
-        {children}
+      {children}
     </AuthContext.Provider>
   );
 }

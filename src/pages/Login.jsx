@@ -9,7 +9,6 @@ import { Briefcase, Lock } from 'lucide-react';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [nit, setNit] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -21,8 +20,8 @@ export default function Login() {
     setError('');
 
     // Simulate network delay for premium feel
-    setTimeout(() => {
-      const success = login(username, password, nit);
+    setTimeout(async () => {
+      const success = await login(username, password);
       if (success) {
         navigate('/');
       } else {
@@ -57,12 +56,12 @@ export default function Login() {
         <Card className="!p-8 sm:rounded-2xl border border-white/40 dark:border-neutral-800 backdrop-blur-xl bg-white/60 dark:bg-neutral-900/60">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <Input
-              label="Usuario"
-              type="text"
+              label="Correo Electrónico"
+              type="email"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Ej. admin"
+              placeholder="usuario@empresa.com"
               autoComplete="username"
             />
             
@@ -75,15 +74,6 @@ export default function Login() {
               placeholder="••••••••"
               autoComplete="current-password"
             />
-            
-            <Input
-              label="NIT de Tu Empresa (Simulación SaaS)"
-              type="text"
-              required
-              value={nit}
-              onChange={(e) => setNit(e.target.value)}
-              placeholder="Ej. 06140101011001"
-            />
 
             {error && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-medium animate-in fade-in slide-in-from-top-1">
@@ -94,7 +84,7 @@ export default function Login() {
             <Button
               type="submit"
               className="w-full flex justify-center py-3"
-              disabled={isLoading || !username || !password || !nit}
+              disabled={isLoading || !username || !password}
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
