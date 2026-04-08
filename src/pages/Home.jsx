@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,6 +11,51 @@ import {
 
 export default function Home() {
   const { user } = useAuth();
+  const [timeLeft, setTimeLeft] = useState({ text: "Calculando...", expired: false });
+
+  useEffect(() => {
+    const calculateDeadline = () => {
+      const now = new Date();
+      // Calcular el décimo día hábil del mes actual
+      let deadline = new Date(now.getFullYear(), now.getMonth(), 1);
+      let businessDays = 0;
+
+      while (businessDays < 10) {
+        const dayOfWeek = deadline.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          businessDays++;
+        }
+        if (businessDays < 10) {
+          deadline.setDate(deadline.getDate() + 1);
+        }
+      }
+
+      // La presentación debe hacerse hasta las 23:59:59 del 10mo día hábil
+      deadline.setHours(23, 59, 59, 999);
+
+      const diff = deadline - now;
+
+      if (diff < 0) {
+        setTimeLeft({ text: "Plazo concluido", expired: true });
+        return;
+      }
+
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+
+      if (d > 0) {
+        setTimeLeft({ text: `${d}d ${h}h ${m}m`, expired: false });
+      } else {
+        setTimeLeft({ text: `${h}h ${m}m ${s}s`, expired: false });
+      }
+    };
+
+    calculateDeadline();
+    const intervalId = setInterval(calculateDeadline, 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const stats = [
     { name: 'Ventas a Consumidor Final', value: '$84,500.00', icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-500/1' },
@@ -75,13 +121,17 @@ export default function Home() {
         </Card>
 
         <Card className="bg-gradient-to-br from-indigo-900 to-blue-900 text-white border-0">
-          <h3 className="text-lg font-bold mb-2">Recordatorio Físico</h3>
+          <h3 className="text-lg font-bold mb-2">Recordatorio Declaración de F14 y F07</h3>
           <p className="text-indigo-200 text-sm mb-6">
             La declaración del Formulario F-07 (IVA) debe presentarse en los primeros 10 días hábiles de cada mes.
           </p>
           <div className="bg-white/10 p-4 rounded-xl backdrop-blur-md border border-white/20">
-            <p className="text-xs font-medium text-indigo-300 uppercase tracking-wider mb-1">Días Restantes</p>
-            <p className="text-4xl font-extrabold">5 días</p>
+            <p className="text-xs font-medium text-indigo-300 uppercase tracking-wider mb-1">
+              {timeLeft.expired ? "Estado" : "Tiempo Restante"}
+            </p>
+            <p className={`text-4xl font-extrabold ${timeLeft.expired ? "text-rose-400" : ""}`}>
+              {timeLeft.text}
+            </p>
           </div>
         </Card>
       </div>

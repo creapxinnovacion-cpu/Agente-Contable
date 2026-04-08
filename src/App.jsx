@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import CargaDatos from './pages/CargaDatos';
 import LibrosIVA from './pages/LibrosIVA';
 import Json from './pages/Json';
+import Empresas from './pages/Empresas';
+import AdminDashboard from './pages/AdminDashboard';
 import Layout from './components/Layout';
 
 // Protected Route Wrapper
@@ -29,9 +31,11 @@ function App() {
         </ProtectedRoute>
       }>
         <Route index element={<Home />} />
+        <Route path="empresas" element={<Empresas />} />
         <Route path="carga-datos" element={<CargaDatos />} />
         <Route path="conversor" element={<Json />} />
         <Route path="libros-iva" element={<LibrosIVA />} />
+        <Route path="admin" element={<AdminDashboard />} />
       </Route>
       
       {/* Fallback */}

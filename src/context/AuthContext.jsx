@@ -8,12 +8,56 @@ export function AuthProvider({ children }) {
 
   // Check auth status on load (mock)
   useEffect(() => {
-    const savedUser = localStorage.getItem('contapp_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const checkAuth = async () => {
+      const savedUser = localStorage.getItem('contapp_user');
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        // Intentar recargar las empresas en background
+        await fetchUserEmpresas(parsedUser);
+      }
+      setLoading(false);
+    };
+    checkAuth();
   }, []);
+
+  const fetchUserEmpresas = async (currentUser) => {
+    try {
+      // Usar el nuevo endpoint provisto: /usuario-empresas/list
+      const res = await fetch(`https://api-agente-contable.onrender.com/usuario-empresas/list`, {
+        headers: { 'Authorization': `Bearer ${currentUser.token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Datos del endpoint List:", data);
+        
+        // El listado puede contener todo, filtramos únicamente para el usuario actual
+        // usando String() para prevenir que "1" !== 1 
+        const misEmpresasArr = data
+          .filter(item => String(item.usuario_id) === String(currentUser.id))
+          .map(item => ({
+            id: item.empresa_id,
+            nombre_razon_social: item.nombre_razon_social,
+            nombre: item.nombre_razon_social, // Duplicar en 'nombre' para compatibilidad
+            nit: item.nit
+        }));
+        
+        console.log("Empresas filtradas para el dashboard:", misEmpresasArr);
+
+        if (misEmpresasArr.length > 0) {
+          const updatedUser = { 
+            ...currentUser, 
+            empresas: misEmpresasArr,
+            empresaActiva: currentUser.empresaActiva?.nombre ? currentUser.empresaActiva : misEmpresasArr[0] 
+          };
+          setUser(updatedUser);
+          localStorage.setItem('contapp_user', JSON.stringify(updatedUser));
+        }
+      }
+    } catch (e) {
+      console.log('Error recargando empresas:', e);
+    }
+  };
   //validacion de credenciales de los usuarios para el ingreso a la platarform
   const login = async (username, password) => {
     try {
@@ -60,12 +104,16 @@ export function AuthProvider({ children }) {
         empresaActiva: {
           id: payload.empresa_id || payload.empresaActiva || 1,
           nit: payload.nit || payload.nitEmpresa || "", // Elemento clave para detectar Ventas vs Compras
-          nombre: payload.nombre_razon_social || ""
-        }
+          nombre: payload.nombre_razon_social || payload.nombre || ""
+        },
+        empresas: [] // Se poblará con fetchUserEmpresas
       };
 
       setUser(finalUser);
       localStorage.setItem('contapp_user', JSON.stringify(finalUser));
+      
+      // Llamamos asíncronamente para cargar el dropdown de las empresas vinculadas
+      fetchUserEmpresas(finalUser);
 
       return true;
 
@@ -80,8 +128,19 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('contapp_user');
   };
 
+  const switchEmpresa = (nuevaEmpresaActiva) => {
+    if (user) {
+      const updatedUser = {
+        ...user,
+        empresaActiva: nuevaEmpresaActiva
+      };
+      setUser(updatedUser);
+      localStorage.setItem('contapp_user', JSON.stringify(updatedUser));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, switchEmpresa }}>
       {children}
     </AuthContext.Provider>
   );

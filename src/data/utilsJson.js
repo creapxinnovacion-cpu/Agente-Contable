@@ -32,39 +32,55 @@ export function formatCurrency(value) {
 /* ===============================
    Detector de Tipo DTE
 ================================ */
-export function detectarTipoDTE(json, miNit) {
+export function detectarTipoDTE(json, miNit, miNombre = "") {
   const identificacion = json.identificacion || {};
   const tipo = identificacion.tipoDte || "";
+  
   const nitEmisor = String(json.emisor?.nit || "").replace(/-/g, "");
+  const nombreEmisor = String(json.emisor?.nombre || "").trim().toUpperCase();
+
+  const nitReceptor = String(json.receptor?.nit || "").replace(/-/g, "");
+  const docReceptor = String(json.receptor?.numDocumento || "").replace(/-/g, "");
+  const nombreReceptor = String(json.receptor?.nombre || "").trim().toUpperCase();
+
+  // SANITIZE miNit to avoid formatting mismatch
+  const miNitLimpio = String(miNit || "").replace(/-/g, "");
+  const miNombreLimpio = String(miNombre || "").trim().toUpperCase();
+
+  // Función que detecta si nuestro NIT o Nombre de Empresa figura en las propiedades pasadas
+  const coincidenciaMuestra = (nitDoc, docDoc, nombreDoc) => {
+    if (miNitLimpio && (nitDoc === miNitLimpio || docDoc === miNitLimpio)) return true;
+    if (miNombreLimpio && miNombreLimpio.length > 3 && nombreDoc.includes(miNombreLimpio)) return true;
+    return false;
+  };
+
+  // Verificamos de qué lado de la balanza estamos
+  const somosEmisor = coincidenciaMuestra(nitEmisor, "", nombreEmisor);
+  const somosReceptor = coincidenciaMuestra(nitReceptor, docReceptor, nombreReceptor);
 
   // 01 = Factura (Consumidor Final)
   // 03 = Comprobante de Crédito Fiscal (Contribuyentes)
-  // 11 = Factura de Exportación
-  // 14 = Factura de Sujeto Excluido
   
-  // SANITIZE miNit to avoid formatting mismatch
-  const miNitLimpio = String(miNit || "").replace(/-/g, "");
+  let resultadoFinal = "desconocido";
 
   if (tipo === "01") {
-    // Si somos los emisores, es una Venta a Consumidor Final legítima
-    if (!miNitLimpio || nitEmisor === miNitLimpio) {
-       return "consumidor_final";
+    if (somosReceptor) {
+       resultadoFinal = "compra";
     } else {
-       // Somos los receptores (Compra como Consumidor Final de empresa)
-       return "compra";
+       // Si no somos explicitamente el receptor, y/o somos el emisor, es venta.
+       // Al generar DTEs de prueba, puede que el NIT Emisor sea otro, así que damos 
+       // peso a que NO somos el receptor para dictaminar que son nuestras ventas.
+       resultadoFinal = "consumidor_final";
     }
   } else if (tipo === "03") {
-    if (!miNitLimpio || nitEmisor === miNitLimpio) {
-       // Nosotros emitimos (Venta a contribuyente)
-       return "contribuyente";
+    if (somosReceptor) {
+       resultadoFinal = "compra";
     } else {
-       // Nos emitieron a nosotros (Compra CCF)
-       return "compra";
+       resultadoFinal = "contribuyente";
     }
-  } 
-  
-  // Por defecto, lo marcamos para revisión
-  return "desconocido";
+  }
+
+  return resultadoFinal;
 }
 
 /* =======================================================
@@ -85,6 +101,21 @@ export function mapToContribuyentes(json) {
     selloRecepcion = sello.selloRecepcion;
   }
 
+  const netoGravado = parseFloat(resumen.totalGravada) || parseFloat(resumen.subTotal) || 0;
+  
+  let iva = 0;
+  if (resumen.tributos && Array.isArray(resumen.tributos)) {
+    const tribIva = resumen.tributos.find(t => t.codigo === "20");
+    if (tribIva) iva = parseFloat(tribIva.valor) || 0;
+  }
+  if (!iva && resumen.totalIva) {
+    iva = parseFloat(resumen.totalIva) || 0;
+  }
+  // Auto-corrección en conversión
+  if (iva === 0 && netoGravado > 0) {
+    iva = +(netoGravado * 0.13).toFixed(2);
+  }
+
   return {
     "numeroComprobante": identificacion.numeroControl || identificacion.codigoGeneracion || "",
     "fecha": identificacion.fecEmi || "",
@@ -97,10 +128,8 @@ export function mapToContribuyentes(json) {
     "tipoDocumento": identificacion.tipoDte || "03",
     "exento": parseFloat(resumen.totalExenta) || 0,
     "noSujeto": parseFloat(resumen.totalNoSujeta) || parseFloat(resumen.totalNoSuj) || 0,
-    "netoGravado": parseFloat(resumen.totalGravada) || parseFloat(resumen.subTotal) || 0,
-    "iva": parseFloat(resumen.totalIva) || 0
-    // El IVA (13%) se calcula automáticamente en LibrosIVA.jsx para la visualización,
-    // pero lo guardamos crudo para el CSV por si ya viene.
+    "netoGravado": netoGravado,
+    "iva": iva
   };
 }
 
@@ -127,6 +156,21 @@ export function mapToCompras(json) {
   const emisor = json.emisor || {};
   const resumen = json.resumen || {};
 
+  const netoGravado = parseFloat(resumen.totalGravada) || parseFloat(resumen.subTotal) || 0;
+  
+  let iva = 0;
+  if (resumen.tributos && Array.isArray(resumen.tributos)) {
+    const tribIva = resumen.tributos.find(t => t.codigo === "20");
+    if (tribIva) iva = parseFloat(tribIva.valor) || 0;
+  }
+  if (!iva && resumen.totalIva) {
+    iva = parseFloat(resumen.totalIva) || 0;
+  }
+  // Auto-corrección en conversión
+  if (iva === 0 && netoGravado > 0) {
+    iva = +(netoGravado * 0.13).toFixed(2);
+  }
+
   return {
     "numeroDocumento": identificacion.numeroControl || identificacion.codigoGeneracion || "",
     "fecha": identificacion.fechaEmision || identificacion.fecEmi || "",
@@ -135,7 +179,8 @@ export function mapToCompras(json) {
     "nit": emisor.nit || "",
     "dui": emisor.dui || emisor.documento || "",
     "exento": parseFloat(resumen.totalExenta) || 0,
-    "netoGravado": parseFloat(resumen.totalGravada) || parseFloat(resumen.subTotal) || 0,
+    "netoGravado": netoGravado,
+    "iva": iva,
     // [Agregados MH F-07 Anexo 3]
     "codigoGeneracion": identificacion.codigoGeneracion || "",
     "numeroControl": identificacion.numeroControl || "",

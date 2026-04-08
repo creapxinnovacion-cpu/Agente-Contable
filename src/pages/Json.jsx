@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 export default function Json() {
   const { user } = useAuth();
   const miNit = user?.empresaActiva?.nit || "";
+  const miNombre = user?.empresaActiva?.nombre || "";
 
   const [data, setData] = useState({
     ventasConsumidorFinal: [],
@@ -44,7 +45,7 @@ export default function Json() {
           const json = JSON.parse(e.target.result);
           
           // Detectar automáticamente el tipo de documento para clasificarlo
-          const tipo = detectarTipoDTE(json, miNit);
+          const tipo = detectarTipoDTE(json, miNit, miNombre);
           
           if (tipo === 'consumidor_final') {
             batch.ventasConsumidorFinal.push(mapToConsumidorFinal(json));
